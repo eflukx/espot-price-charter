@@ -1,9 +1,9 @@
 # --- STAGE 1: Builder ---
 # We gebruiken de officiële Rust image als basis om onze applicatie te compileren.
-FROM rust:1.88 as builder
+FROM rust:1.96 as builder
 
-# Installeer de musl C-compiler die nodig is voor de 'ring' crate ---
-RUN apt-get update && apt-get install -y musl-tools && rm -rf /var/lib/apt/lists/*
+# Installeer de musl C-compiler die nodig is voor de 'ring' crate en ca-certificates voor HTTPS
+RUN apt-get update && apt-get install -y musl-tools ca-certificates && rm -rf /var/lib/apt/lists/*
 
 # Installeer de 'musl' target om een statisch gelinkte binary te kunnen bouwen.
 RUN rustup target add x86_64-unknown-linux-musl
@@ -12,19 +12,24 @@ RUN rustup target add x86_64-unknown-linux-musl
 WORKDIR /app
 
 # Kopieer de dependency-bestanden en bouw de dependencies apart.
-# Dit maakt gebruik van Docker's layer caching voor snellere builds.
+# Dit maakt gebruik van Docker's layer caching en cargo registry caching voor snellere builds.
 COPY Cargo.toml Cargo.lock ./
 # Maak een dummy src/main.rs aan om dependencies te kunnen bouwen
 RUN mkdir src && echo "fn main(){}" > src/main.rs
-RUN cargo build --release --target x86_64-unknown-linux-musl --locked
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/app/target \
+    cargo build --release --target x86_64-unknown-linux-musl --locked
 
 # Kopieer de rest van de source code en de HTML file.
 COPY src ./src
 COPY index.html ./index.html
 
-# Bouw de uiteindelijke applicatie.
-# De --touch stap zorgt ervoor dat Cargo de wijzigingen detecteert.
-RUN touch src/main.rs && cargo build --release --target x86_64-unknown-linux-musl --locked
+# Bouw de uiteindelijke applicatie met cache mounts.
+RUN touch src/main.rs
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/app/target \
+    cargo build --release --target x86_64-unknown-linux-musl --locked && \
+    cp target/x86_64-unknown-linux-musl/release/energy-chart /energy-chart-binary
 
 
 # --- STAGE 2: Final ---
@@ -32,10 +37,13 @@ RUN touch src/main.rs && cargo build --release --target x86_64-unknown-linux-mus
 FROM scratch
 
 # Kopieer de gecompileerde, statische binary van de builder stage.
-COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/energy-chart /energy-chart
+COPY --from=builder /energy-chart-binary /energy-chart
 
 # Kopieer het HTML-bestand van de builder stage.
 COPY --from=builder /app/index.html /app/index.html
+
+# Kopieer de ca-certificates van de builder stage voor HTTPS-aanroepen.
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 
 # Stel de environment variabelen in zodat de app weet waar hij moet luisteren
 # en waar het HTML-bestand te vinden is.
