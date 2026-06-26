@@ -259,8 +259,12 @@ async fn fetch_and_cache(
             )
         })?;
 
-        state.cache.insert(cache_key.clone(), data.clone()).await;
-        tracing::info!("Data opgeslagen in cache voor key: {}", cache_key);
+        if is_empty_data(&data) {
+            tracing::warn!("Ontvangen data is leeg voor key: {}, wordt NIET gecachet", cache_key);
+        } else {
+            state.cache.insert(cache_key.clone(), data.clone()).await;
+            tracing::info!("Data opgeslagen in cache voor key: {}", cache_key);
+        }
         Ok(data)
     } else {
         tracing::error!("Externe API gaf een foutstatus: {}", response.status());
@@ -268,6 +272,26 @@ async fn fetch_and_cache(
             StatusCode::BAD_GATEWAY,
             "De externe API gaf een fout terug.".to_string(),
         ))
+    }
+}
+
+/// Controleert of de ontvangen energie-data leeg is (geen gegevens bevat).
+fn is_empty_data(data: &EnergyData) -> bool {
+    match data {
+        serde_json::Value::Null => true,
+        serde_json::Value::Array(arr) => arr.is_empty(),
+        serde_json::Value::Object(obj) => {
+            if let Some(val) = obj.get("data") {
+                match val {
+                    serde_json::Value::Null => true,
+                    serde_json::Value::Array(arr) => arr.is_empty(),
+                    _ => false,
+                }
+            } else {
+                obj.is_empty()
+            }
+        }
+        _ => false,
     }
 }
 
@@ -315,4 +339,37 @@ async fn warm_up_cache(state: AppState, concurrency: usize, warmup_days: i64, ti
         .await;
 
     tracing::info!("Cache opwarmen voltooid.");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_is_empty_data() {
+        // Null is empty
+        assert!(is_empty_data(&serde_json::Value::Null));
+
+        // Empty array is empty
+        assert!(is_empty_data(&json!([])));
+
+        // Non-empty array is not empty
+        assert!(!is_empty_data(&json!([1, 2, 3])));
+
+        // Empty object is empty
+        assert!(is_empty_data(&json!({})));
+
+        // Object with empty "data" array is empty
+        assert!(is_empty_data(&json!({ "data": [] })));
+
+        // Object with null "data" is empty
+        assert!(is_empty_data(&json!({ "data": null })));
+
+        // Object with non-empty "data" array is NOT empty
+        assert!(!is_empty_data(&json!({ "data": [ { "date": "2023-01-01", "value": 10 } ] })));
+
+        // Object with other key-values but no "data" is NOT empty
+        assert!(!is_empty_data(&json!({ "other": 123 })));
+    }
 }
