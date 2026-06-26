@@ -1,6 +1,6 @@
 # --- STAGE 1: Builder ---
 # We gebruiken de officiële Rust image als basis om onze applicatie te compileren.
-FROM rust:1.96 as builder
+FROM rust:1.96 AS builder
 
 # Installeer de musl C-compiler die nodig is voor de 'ring' crate en ca-certificates voor HTTPS
 RUN apt-get update && apt-get install -y musl-tools ca-certificates && rm -rf /var/lib/apt/lists/*

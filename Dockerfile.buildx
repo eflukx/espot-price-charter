@@ -1,6 +1,6 @@
 # --- STAGE 1: Builder ---
 # We gebruiken de officiële Rust image als basis om onze applicatie te compileren.
-FROM --platform=$BUILDPLATFORM rust:1.96 as builder
+FROM --platform=$BUILDPLATFORM rust:1.96 AS builder
 
 # ARG's om de doelarchitectuur te bepalen. Deze worden automatisch door `buildx` gevuld.
 ARG TARGETPLATFORM
