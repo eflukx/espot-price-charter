@@ -7,7 +7,7 @@ De backend fungeert als een slimme proxy die de data van de ANWB API ophaalt, de
 ## Features
 
 -   **Interactieve Grafieken:** Visualiseer energieprijzen per uur, dag of maand.
--   **Slimme Caching:** Een in-memory cache (met configureerbare TTL) vermindert de laadtijd en het aantal aanvragen naar de externe API.
+-   **Slimme Caching:** Een in-memory cache vermindert de laadtijd en het aantal aanvragen naar de externe API door reeds opgehaalde data permanent te bewaren (energieprijzen veranderen immers niet meer nadat ze zijn gepubliceerd).
 -   **Parallelle Cache Warming:** Bij het opstarten wordt de cache voor de afgelopen 7 dagen op de achtergrond gevuld voor een snelle eerste ervaring.
 -   **Dynamische Frontend:** De backend serveert een moderne, single-page frontend die communiceert via een interne API.
 -   **Volledig Configureerbaar:** Pas het luisteradres, cache-instellingen en log-levels aan via environment variabelen.
@@ -51,8 +51,10 @@ Je kunt de applicatie configureren door de volgende environment variabelen in te
 | -------------------------- | --------------------------------------------------------- | ------------------- | ----------------------------------------- |
 | `LISTEN_ADDR`              | Het IP-adres en de poort waarop de server luistert.       | `127.0.0.1:3000`    | `$env:LISTEN_ADDR="0.0.0.0:8080"`         |
 | `STATIC_FILE_PATH`         | Het pad naar het te serveren `index.html` bestand.        | `index.html`        | `$env:STATIC_FILE_PATH="static/app.html"` |
-| `CACHE_TTL_SECONDS`        | De levensduur van een cache-item in seconden.             | `3600` (1 uur)      | `$env:CACHE_TTL_SECONDS="600"`            |
+| `CACHE_CAPACITY`           | De maximale capaciteit van de in-memory cache.            | `10000`             | `$env:CACHE_CAPACITY="5000"`              |
+| `CACHE_WARMUP_DAYS`        | Aantal dagen historie om te cachen tijdens het opstarten. | `7`                 | `$env:CACHE_WARMUP_DAYS="14"`             |
 | `CACHE_WARMUP_CONCURRENCY` | Het max. aantal parallelle requests tijdens het opwarmen. | `10`                | `$env:CACHE_WARMUP_CONCURRENCY="4"`       |
+| `TIMEZONE`                 | De lokale tijdzone voor de datums en tijden.              | `Europe/Amsterdam`  | `$env:TIMEZONE="Europe/Brussels"`         |
 | `RUST_LOG`                 | Bepaalt het log-niveau.                                   | `energy_proxy=info` | `$env:RUST_LOG="debug"`                   |
 
 **Voorbeeld (PowerShell):**
